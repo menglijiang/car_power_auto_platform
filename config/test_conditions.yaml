@@ -1,0 +1,148 @@
+# config/test_conditions.yaml
+# 48V电源模块测试条件配置 - 基于SOR文档V1.0
+
+# 1. 基本工作条件（文档2.1节）
+operating_conditions:
+  temperature_range:
+    min: -40    # °C
+    max: 105    # °C
+  humidity_range:
+    min: 0      # %
+    max: 85     # %
+  vibration_level: 10  # G
+  storage_life: 15     # 年
+
+# 2. 降压模式测试条件（文档2.2.3）
+buck_mode_tests:
+  input_voltage_range: [18, 24, 42, 60]  # V
+  output_voltage: 14  # V (3:1比例)
+  power_requirements:
+    - conditions: {temperature: 25, input_voltage: 42, min_power: 1000}  # W
+    - conditions: {temperature: 65, input_voltage: 42, min_power: 700}   # W
+    - conditions: {temperature: 85, input_voltage: 42, min_power: 600}   # W
+  efficiency_threshold: 97.5  # % @500W, 42V, 25°C
+
+# 3. 升压模式测试条件（文档2.2.4）
+boost_mode_tests:
+  input_voltage_range: [9, 12, 14, 18]  # V
+  output_voltage: 42  # V (1:3比例)
+  power_requirements:
+    - conditions: {temperature: 85, input_voltage: 14, min_power: 600}  # W
+
+# 4. 瞬态响应测试条件（文档2.2.5）
+transient_tests:
+  condition_1:  # 负载瞬变要求一
+    input_voltage: 42
+    output_voltage: 14
+    current_slew_rate: 10  # A/μs
+    voltage_overshoot_max: 10  # %
+    description: "电流变换斜率为10A/us,输出电压波动<10%"
+
+  condition_2:  # 负载瞬变要求二
+    input_voltage: 42
+    output_voltage: 14
+    base_current: 30  # A
+    superimposed_current: [10, 20]  # A (需根据文档补充具体值)
+    current_slew_rate: 10  # A/μs
+    min_output_voltage: 9  # V
+    description: "输出30A电流工况下叠加工况"
+
+  condition_3:  # 负载瞬变要求三
+    temperature: 85  # °C
+    input_voltage: 42
+    output_voltage: 14
+    base_current: 14  # A
+    superimposed_current: 44  # A
+    duration: 10  # s
+    voltage_overshoot_max: 5  # %
+    description: "85°C下叠加44A负载持续10s"
+
+# 5. 保护功能测试条件（文档2.3.3）
+protection_tests:
+  over_voltage_protection:
+    hp_ovp_threshold: 70  # V (HP侧过压关断)
+    lp_ovp_threshold: 24  # V (LP侧过压关断)
+
+  under_voltage_protection:
+    hp_uvp_threshold: 16  # V (HP侧欠压关断)
+
+  over_current_protection:
+    response_time_fast: 0.001  # s (us级快速关断)
+    response_time_slow: 1.0    # s (s级慢速关断)
+
+  thermal_protection:
+    ntc_count: 2  # 2个NTC监控温度
+    warning_threshold: 100  # °C (过温预警)
+    shutdown_threshold: 105 # °C (过温关断)
+
+# 6. 启动和功能测试（文档2.3.2）
+startup_tests:
+  soft_start:
+    max_capacitive_load: 3  # mF
+    voltage_rise_monotonic: true
+  startup_time:
+    en_to_90percent_max: 40  # ms
+  hot_start:
+    supported: true
+    external_voltage: 10  # V
+
+# 7. 可靠性测试条件（文档3.1节）
+reliability_tests:
+  temperature_cycling:
+    temperature_range: [-40, 105]  # °C
+    cycles: 1000
+    dwell_time: 10  # 分钟
+    ramp_rate: 20   # °C/分钟
+    samples: 32
+
+  low_temperature_storage:
+    temperature: -40  # °C
+    duration: 1000     # 小时
+    samples: 30
+
+  drop_test:
+    acceleration: 1500  # G
+    duration: 0.5      # ms
+    pulses: 30
+    orientation: "Y1"   # 芯片面朝下
+    samples: 6
+
+# 8. EMC测试条件（文档2.5.2节）
+emc_tests:
+  conducted_emission:
+    frequency_range: [0.1, 1000]  # MHz
+    limits:
+      - band: [0.1, 0.15], limit: 76, bandwidth: 9
+      - band: [0.15, 30], limit: "76~30", bandwidth: 9
+      - band: [30, 1000], limit: 30, bandwidth: 120
+
+  dpi_test:
+    frequency_bands:
+      - range: [0.1, 1], step: 0.1
+      - range: [1, 10], step: 0.5
+      - range: [10, 100], step: 1
+      - range: [100, 200], step: 2
+      - range: [200, 400], step: 4
+      - range: [400, 1000], step: 10
+    injection_levels:
+      global_pins: 30  # dBm
+      local_pins: 12   # dBm
+
+# 9. 生产测试要求（文档2.8节）
+production_tests:
+  coverage_requirement: 100  # %
+  burn_in_tests:
+    temperature: "待定"      # °C
+    voltage: "待定"         # V
+    conditions:
+      - mode: "空载", cycles: true
+      - mode: "带载", power: 500, cycles: true  # W
+    duration:
+      sop_plus_6: 4    # 小时
+      after_sop_plus_6: 2  # 小时
+
+# 10. 质量目标（文档3.2节）
+quality_targets:
+  zero_km_failure_rate: 0    # ppm
+  annual_failure_rate: 5     # ppm
+  fit_rate: 200             # FIT

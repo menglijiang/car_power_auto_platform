@@ -1,0 +1,232 @@
+# 汽车电源自动化测试框架配置
+# 版本: 1.0.0
+# 最后更新: 2024-01-27
+
+# 默认测试配置
+default:
+  description: "默认电源测试配置"
+
+  # 仪器设备设置
+  instrument_setup:
+    power_supply_addr: "TCPIP0::192.168.1.100::inst0::INSTR"
+    dmm_addr: "TCPIP0::192.168.1.101::inst0::INSTR"
+    can_channel: "can0"
+    baud_rate: 500000
+    timeout: 5.0  # 秒
+
+  # 测试参数
+  test_parameters:
+    voltage_tolerance: 0.1  # 电压容差 10%
+    current_tolerance: 0.05  # 电流容差 5%
+    sampling_interval: 0.1  # 采样间隔 0.1秒
+    measurement_samples: 5  # 测量样本数
+    max_current: 10.0  # 最大电流限制
+
+  # 安全限制
+  safety_limits:
+    over_voltage: 16.0  # 过压保护
+    under_voltage: 9.0  # 欠压保护
+    over_current: 10.0  # 过流保护
+    over_temperature: 85.0  # 过温保护
+    short_circuit_current: 20.0  # 短路电流限制
+
+  # 测试阈值
+  test_thresholds:
+    # 上电序列测试阈值
+    power_on_sequence:
+      voltage_rise_time:
+        min: 0.01  # 最小上升时间
+        max: 0.1   # 最大上升时间
+      steady_state_voltage:
+        min: 11.5  # 稳态电压最小值
+        max: 12.5  # 稳态电压最大值
+      inrush_current:
+        max: 15.0  # 浪涌电流最大值
+
+    # 电压边界测试阈值
+    voltage_margins:
+      nominal_voltage: 12.0
+      margin_low: -0.5
+      margin_high: 0.5
+      test_points: [11.5, 12.0, 12.5]
+
+    # 负载调整率测试
+    load_regulation:
+      light_load: 1.0  # 轻载电流
+      full_load: 5.0   # 满载电流
+      regulation_limit: 0.05  # 调整率限制 5%
+
+# 压力测试配置
+stress_test:
+  description: "电源压力测试配置"
+
+  test_parameters:
+    voltage_sweep_range:
+      start: 9.0
+      stop: 15.0
+      step: 0.5
+    duration_per_point: 60  # 每个测试点持续时间（秒）
+    max_temperature: 85.0
+
+  stress_profiles:
+    - name: "高温测试"
+      temperature: 70.0
+      voltage: 12.0
+      duration: 3600
+    - name: "低温测试"
+      temperature: -20.0
+      voltage: 12.0
+      duration: 3600
+    - name: "电压循环测试"
+      voltages: [9.0, 12.0, 15.0]
+      cycles: 100
+      dwell_time: 10
+
+# 故障注入测试配置
+fault_injection:
+  description: "故障注入测试配置"
+
+  fault_scenarios:
+    - name: "电压跌落测试"
+      description: "模拟电压瞬间跌落"
+      normal_voltage: 12.0
+      dip_voltage: 8.0
+      dip_duration: 0.1
+      recovery_time: 0.5
+
+    - name: "电压浪涌测试"
+      description: "模拟电压浪涌"
+      normal_voltage: 12.0
+      surge_voltage: 16.0
+      surge_duration: 0.05
+
+    - name: "短路测试"
+      description: "模拟输出短路"
+      pre_short_voltage: 12.0
+      short_duration: 0.01
+      current_limit: 20.0
+
+    - name: "过流测试"
+      description: "模拟过流条件"
+      voltage: 12.0
+      overload_current: 15.0
+      duration: 1.0
+
+# 测试序列定义
+test_sequences:
+  power_on_sequence:
+    description: "标准上电序列测试"
+    steps:
+      - step: 1
+        action: "initialize"
+        params:
+          voltage: 0.0
+          current_limit: 5.0
+        delay: 0.1
+
+      - step: 2
+        action: "set_voltage"
+        params:
+          voltage: 12.0
+        delay: 0.1
+
+      - step: 3
+        action: "enable_output"
+        params:
+          enable: true
+        delay: 0.5
+
+      - step: 4
+        action: "measure"
+        params:
+          type: "voltage_current"
+        samples: 5
+        interval: 0.1
+
+      - step: 5
+        action: "validate"
+        params:
+          voltage_min: 11.5
+          voltage_max: 12.5
+          current_max: 10.0
+
+  voltage_sweep_test:
+    description: "电压扫描测试序列"
+    steps:
+      - step: 1
+        action: "set_voltage"
+        params:
+          voltage: 10.0
+        delay: 0.2
+
+      - step: 2
+        action: "measure"
+        params:
+          type: "voltage_current"
+        samples: 3
+
+      - step: 3
+        action: "increment_voltage"
+        params:
+          step: 0.5
+        delay: 0.1
+
+      - step: 4
+        action: "repeat"
+        params:
+          count: 10
+        goto_step: 2
+
+# 报告配置
+reporting:
+  html_report:
+    enabled: true
+    output_dir: "reports/html"
+    title: "汽车电源测试报告"
+    theme: "standard"
+
+  allure_report:
+    enabled: true
+    output_dir: "reports/allure-results"
+
+  csv_export:
+    enabled: true
+    output_dir: "reports/csv"
+    include_timestamp: true
+
+  email_notification:
+    enabled: false
+    recipients: []
+    on_failure: true
+    on_success: false
+
+# 日志配置
+logging:
+  level: "INFO"
+  file:
+    enabled: true
+    path: "logs/power_test.log"
+    max_size: 10485760  # 10MB
+    backup_count: 5
+  console:
+    enabled: true
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# 执行控制
+execution:
+  max_test_duration: 3600  # 最大测试持续时间（秒）
+  stop_on_failure: false
+  retry_failed_tests: 3
+  parallel_execution: false
+  worker_count: 4
+
+# 环境信息
+environment:
+  test_stand: "电源测试台#1"
+  location: "测试实验室A区"
+  operator: "测试工程师"
+  dut_model: "汽车电源模块V2.0"
+  dut_serial: "PS-2024-001"
+  test_date: "2024-01-27"
+  temperature: 25.0
+  humidity: 50.0

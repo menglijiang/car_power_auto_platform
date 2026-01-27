@@ -1,0 +1,22 @@
+# 汽车电源测试框架 - 最小依赖配置（Windows优化版）
+# 测试框架核心
+pytest==7.4.0
+pytest-html==4.1.1
+
+# 硬件通信（Windows版本）
+pyvisa==1.13.0
+pyvisa-py==0.7.0
+python-can==4.2.0  # 使用较旧但稳定的版本
+
+# 数据配置处理（使用ruamel.yaml替代pyyaml，避免编译问题）
+ruamel.yaml==0.17.21
+
+# 基础工具
+colorama==0.4.6
+loguru==0.7.2
+
+# 可选：如果需要并行测试，但可能有问题
+# pytest-xdist==3.3.0
+
+# 可选：如果需要Allure报告
+# allure-pytest==2.13.0
