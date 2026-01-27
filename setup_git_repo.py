@@ -1,454 +1,415 @@
 #!/usr/bin/env python3
 """
-汽车电源测试框架 - Git仓库自动化设置脚本（修复版）
-修复提交失败问题，自动配置Git用户信息
+汽车电源测试框架 - 专业版Git仓库设置工具
+优化终端界面，提供清晰、专业的操作体验
 """
 import os
 import sys
 import subprocess
 import time
+import json
 from pathlib import Path
-import getpass
+from typing import Tuple, Dict, Optional
+import textwrap
+from datetime import datetime
 
 
-class GitRepositorySetup:
-    """Git仓库自动化设置类（修复版）"""
+class ConsoleFormatter:
+    """控制台格式化类 - 提供专业的终端输出"""
 
-    def __init__(self, project_path=None, github_username=None, repo_name="car_power_auto_platform"):
-        """
-        初始化Git仓库设置
+    # Unicode符号和颜色定义
+    SYMBOLS = {
+        'success': '✓',
+        'error': '✗',
+        'warning': '⚠',
+        'info': 'ℹ',
+        'arrow': '➤',
+        'dot': '•',
+        'check': '✔',
+        'cross': '✖',
+        'bullet': '●',
+        'empty': '○'
+    }
 
-        Args:
-            project_path: 项目路径，默认为当前目录
-            github_username: GitHub用户名
-            repo_name: 仓库名称
-        """
-        self.project_path = Path(project_path) if project_path else Path.cwd()
-        self.github_username = github_username
+    COLORS = {
+        'success': '\033[92m',  # 绿色
+        'error': '\033[91m',  # 红色
+        'warning': '\033[93m',  # 黄色
+        'info': '\033[94m',  # 蓝色
+        'header': '\033[95m',  # 紫色
+        'step': '\033[96m',  # 青色
+        'reset': '\033[0m'  # 重置
+    }
+
+    @classmethod
+    def print_header(cls, title: str, width: int = 60):
+        """打印标题头"""
+        print("\n" + "=" * width)
+        print(f"{cls.COLORS['header']}{title.center(width)}{cls.COLORS['reset']}")
+        print("=" * width)
+
+    @classmethod
+    def print_step(cls, step_num: int, total_steps: int, description: str):
+        """打印步骤信息"""
+        print(f"\n{cls.COLORS['step']}[步骤 {step_num:2d}/{total_steps:2d}] {description}{cls.COLORS['reset']}")
+
+    @classmethod
+    def print_status(cls, message: str, status: str = "info", indent: int = 2):
+        """打印状态消息"""
+        symbol = cls.SYMBOLS.get(status, '')
+        color = cls.COLORS.get(status, cls.COLORS['info'])
+
+        indent_str = " " * indent
+        wrapped_msg = textwrap.fill(
+            f"{indent_str}{color}{symbol} {message}{cls.COLORS['reset']}",
+            width=80,
+            subsequent_indent=indent_str + "  "
+        )
+        print(wrapped_msg)
+
+    @classmethod
+    def print_result(cls, success: bool, message: str = ""):
+        """打印结果"""
+        if success:
+            print(f"  {cls.COLORS['success']}{cls.SYMBOLS['success']} 完成{cls.COLORS['reset']}", end="")
+            if message:
+                print(f" - {message}")
+            else:
+                print()
+        else:
+            print(f"  {cls.COLORS['error']}{cls.SYMBOLS['error']} 失败{cls.COLORS['reset']}")
+
+    @classmethod
+    def print_summary_table(cls, results: Dict[str, bool]):
+        """打印摘要表格"""
+        print(f"\n{cls.COLORS['header']}{'操作摘要':^60}{cls.COLORS['reset']}")
+        print("-" * 60)
+
+        for step, success in results.items():
+            status = f"{cls.COLORS['success']}成功{cls.COLORS['reset']}" if success else f"{cls.COLORS['error']}失败{cls.COLORS['reset']}"
+            symbol = cls.SYMBOLS['check'] if success else cls.SYMBOLS['cross']
+            print(f"  {symbol} {step:<40} [{status}]")
+
+        print("-" * 60)
+
+    @classmethod
+    def print_progress_bar(cls, current: int, total: int, length: int = 40):
+        """打印进度条"""
+        percent = current / total
+        filled = int(length * percent)
+        bar = "█" * filled + "░" * (length - filled)
+        print(f"\r  [{bar}] {percent:.0%}", end="", flush=True)
+
+    @classmethod
+    def disable_colors(cls):
+        """禁用颜色输出（用于不支持颜色的终端）"""
+        cls.COLORS = {k: '' for k in cls.COLORS}
+
+
+class GitManager:
+    """Git仓库管理器 - 专业版本"""
+
+    def __init__(self, username: str, repo_name: str, project_path: Path):
+        self.username = username
         self.repo_name = repo_name
-        self.remote_url = f"https://github.com/{github_username}/{repo_name}.git"
+        self.project_path = project_path
+        self.results = {}
 
-        # 确保在项目目录中
-        os.chdir(self.project_path)
+        # 检测是否支持颜色
+        if sys.platform == "win32":
+            ConsoleFormatter.disable_colors()
 
-    def run_command(self, command, description=""):
+    def run_command(self, cmd: str, description: str = "", show_output: bool = False) -> Tuple[bool, str]:
         """运行命令并返回结果"""
-        print(f"🔧 {description}...")
-
         try:
             result = subprocess.run(
-                command,
+                cmd,
                 shell=True,
+                cwd=self.project_path,
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
-                errors='ignore'
+                errors='replace',
+                timeout=30
             )
 
-            if result.returncode == 0:
-                print(f"  ✓ 成功")
-                if result.stdout.strip():
-                    print(f"    输出: {result.stdout.strip()[:100]}")
-                return result
-            else:
-                print(f"  ✗ 失败: {result.stderr[:200] if result.stderr else '无错误信息'}")
-                return result
+            success = result.returncode == 0
+            output = result.stdout.strip() or result.stderr.strip()
 
+            if description:
+                self.results[description] = success
+
+            if show_output and output:
+                lines = output.split('\n')
+                for line in lines[:3]:  # 只显示前3行输出
+                    if line.strip():
+                        print(f"      {ConsoleFormatter.SYMBOLS['arrow']} {line}")
+                if len(lines) > 3:
+                    print(f"      ... 还有 {len(lines) - 3} 行输出")
+
+            return success, output
+
+        except subprocess.TimeoutExpired:
+            ConsoleFormatter.print_status("命令执行超时", "error")
+            return False, "命令执行超时"
         except Exception as e:
-            print(f"  ✗ 异常: {e}")
-            return None
+            ConsoleFormatter.print_status(f"执行异常: {e}", "error")
+            return False, str(e)
 
-    def check_git_installed(self):
-        """检查Git是否已安装"""
-        return self.run_command("git --version", "检查Git安装")
+    def check_git_installation(self) -> bool:
+        """检查Git安装"""
+        ConsoleFormatter.print_status("验证Git安装")
+        success, output = self.run_command("git --version", "检查Git安装")
 
-    def initialize_git_repo(self):
-        """初始化Git仓库"""
+        if success:
+            version = output.split()[-1] if output else "未知版本"
+            ConsoleFormatter.print_result(True, f"版本: {version}")
+        else:
+            ConsoleFormatter.print_result(False)
+
+        return success
+
+    def initialize_repository(self) -> bool:
+        """初始化仓库"""
+        ConsoleFormatter.print_status("初始化Git仓库")
+
         git_dir = self.project_path / ".git"
         if git_dir.exists():
-            print("ℹ️  Git仓库已存在，跳过初始化")
+            ConsoleFormatter.print_status("Git仓库已存在", "warning")
+            ConsoleFormatter.print_result(True, "跳过初始化")
             return True
 
-        result = self.run_command("git init", "初始化Git仓库")
-        return result.returncode == 0 if result else False
+        success, output = self.run_command("git init", "初始化仓库")
+        ConsoleFormatter.print_result(success)
+        return success
 
-    def configure_git_user(self):
-        """配置Git用户信息（修复提交失败的关键步骤）"""
-        print("🔧 配置Git用户信息...")
-
-        # 获取系统用户名
-        system_user = getpass.getuser()
-
-        # 如果提供了GitHub用户名，使用它
-        if self.github_username:
-            user_name = self.github_username
-        else:
-            user_name = system_user
+    def configure_user(self) -> bool:
+        """配置用户信息"""
+        ConsoleFormatter.print_status("配置Git用户")
 
         # 设置用户名
-        name_result = self.run_command(f'git config user.name "{user_name}"', "设置用户名")
+        name_success, _ = self.run_command(f'git config user.name "{self.username}"')
 
-        # 设置邮箱（使用GitHub的noreply邮箱格式）
-        if self.github_username:
-            email = f"{self.github_username}@users.noreply.github.com"
-        else:
-            email = f"{system_user}@localhost"
+        # 设置邮箱
+        email = f"{self.username}@users.noreply.github.com"
+        email_success, _ = self.run_command(f'git config user.email "{email}"')
 
-        email_result = self.run_command(f'git config user.email "{email}"', "设置邮箱")
+        success = name_success and email_success
+        ConsoleFormatter.print_result(success, f"用户: {self.username}")
+        return success
 
-        # 验证配置
-        self.run_command("git config --list | grep user", "验证用户配置")
+    def setup_remote(self) -> bool:
+        """设置远程仓库"""
+        ConsoleFormatter.print_status("配置远程仓库")
 
-        return (name_result.returncode == 0 if name_result else False) and \
-            (email_result.returncode == 0 if email_result else False)
+        remote_url = f"https://github.com/{self.username}/{self.repo_name}.git"
 
-    def create_gitignore(self):
-        """创建.gitignore文件"""
-        gitignore_content = """# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environment
-.venv/
-venv/
-ENV/
-env/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Project specific
-backups/*.txt
-logs/*.log
-reports/**/*
-!reports/.gitkeep
-
-# Test reports
-htmlcov/
-.coverage
-.coverage.*
-.pytest_cache/
-.mypy_cache/
-
-# Configurations
-*.local.yaml
-*.secret.yaml
-
-# Data files
-*.csv
-*.xlsx
-*.db
-*.sqlite3
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Documentation
-docs/_build/
-
-# Temporary files
-*.tmp
-*.temp
-"""
-
-        gitignore_path = self.project_path / ".gitignore"
-
-        # 如果.gitignore已存在，备份
-        if gitignore_path.exists():
-            backup_path = self.project_path / ".gitignore.backup"
-            with open(gitignore_path, 'r', encoding='utf-8') as src:
-                with open(backup_path, 'w', encoding='utf-8') as dst:
-                    dst.write(src.read())
-            print("ℹ️  .gitignore已存在，已创建备份")
-
-        with open(gitignore_path, 'w', encoding='utf-8') as f:
-            f.write(gitignore_content)
-        print("✓  创建/更新.gitignore文件")
-
-        return True
-
-    def create_required_dirs(self):
-        """创建必要的空目录"""
-        required_dirs = ['backups', 'logs', 'reports']
-
-        for dir_name in required_dirs:
-            dir_path = self.project_path / dir_name
-            dir_path.mkdir(exist_ok=True)
-
-            if dir_name == 'reports':
-                gitkeep = dir_path / '.gitkeep'
-                gitkeep.touch(exist_ok=True)
-
-        print("✓  创建必要的目录结构")
-        return True
-
-    def get_files_to_add(self):
-        """获取需要添加的文件列表"""
-        result = self.run_command("git status --porcelain", "检查文件状态")
-        if not result or result.returncode != 0:
-            return []
-
-        files = []
-        for line in result.stdout.strip().split('\n'):
-            if line.strip():
-                # 提取文件名（移除状态标记）
-                file_status = line[:2]
-                filename = line[3:]
-                files.append((file_status.strip(), filename))
-
-        return files
-
-    def add_and_commit_files(self):
-        """添加并提交所有文件（修复版）"""
-        print("🔧 添加并提交文件...")
-
-        # 检查是否有文件可添加
-        files = self.get_files_to_add()
-        if not files:
-            print("ℹ️  没有检测到需要添加的文件")
+        # 检查是否已配置远程仓库
+        success, output = self.run_command("git remote -v")
+        if success and "origin" in output:
+            ConsoleFormatter.print_status("远程仓库已配置", "info")
+            ConsoleFormatter.print_result(True, "跳过配置")
             return True
 
-        print(f"ℹ️  检测到 {len(files)} 个文件需要处理")
+        # 添加远程仓库
+        success, output = self.run_command(f"git remote add origin {remote_url}", "添加远程仓库")
+
+        if success:
+            ConsoleFormatter.print_result(True, f"URL: {remote_url}")
+        else:
+            ConsoleFormatter.print_result(False)
+
+        return success
+
+    def add_and_commit_files(self) -> bool:
+        """添加并提交文件"""
+        ConsoleFormatter.print_status("提交代码变更")
+
+        # 检查是否有文件可提交
+        success, output = self.run_command("git status --porcelain")
+        if not success or not output.strip():
+            ConsoleFormatter.print_status("没有检测到变更", "info")
+            ConsoleFormatter.print_result(True, "无需提交")
+            return True
+
+        # 计算文件数量
+        file_count = len([line for line in output.strip().split('\n') if line.strip()])
 
         # 添加所有文件
-        add_result = self.run_command("git add .", "添加所有文件到暂存区")
-        if not add_result or add_result.returncode != 0:
+        ConsoleFormatter.print_status(f"添加 {file_count} 个文件")
+        add_success, _ = self.run_command("git add .")
+
+        if not add_success:
+            ConsoleFormatter.print_result(False)
             return False
 
         # 提交文件
-        commit_message = """初始提交: 汽车电源自动化测试框架
+        commit_msg = f"""初始提交: 汽车电源自动化测试框架
 
 - 电源管理模块
 - 安全监控系统
 - 测试配置文件
-- 依赖检查脚本
-- 完整的测试用例
-- 符合SOR文档V1.0技术要求
-"""
+- 完整的测试用例"""
 
-        commit_cmd = f'git commit -m "{commit_message}"'
-        commit_result = self.run_command(commit_cmd, "提交初始版本")
+        commit_success, _ = self.run_command(f'git commit -m "{commit_msg}"')
 
-        if commit_result and commit_result.returncode == 0:
-            return True
+        if commit_success:
+            ConsoleFormatter.print_result(True, f"提交了 {file_count} 个文件")
         else:
-            # 如果提交失败，尝试查看原因
-            self.run_command("git status", "查看Git状态")
-            return False
+            ConsoleFormatter.print_result(False)
 
-    def rename_main_branch(self):
-        """重命名主分支为main"""
-        # 检查当前分支
-        branch_result = self.run_command("git branch", "检查当前分支")
-        if branch_result and "master" in branch_result.stdout:
-            result = self.run_command("git branch -M main", "重命名主分支为main")
-            return result.returncode == 0 if result else False
-        else:
-            print("ℹ️  当前分支不是master，跳过重命名")
-            return True
+        return commit_success
 
-    def add_remote_origin(self):
-        """添加远程仓库"""
-        if not self.github_username:
-            print("⚠️  未提供GitHub用户名，跳过远程仓库设置")
-            return False
+    def push_to_remote(self, retries: int = 3) -> bool:
+        """推送到远程仓库"""
+        ConsoleFormatter.print_status("推送到GitHub仓库")
 
-        # 检查是否已设置远程仓库
-        remote_result = self.run_command("git remote -v", "检查远程仓库")
-        if remote_result and "origin" in remote_result.stdout:
-            print("ℹ️  远程仓库已存在，跳过添加")
-            return True
+        for attempt in range(retries):
+            if attempt > 0:
+                ConsoleFormatter.print_status(f"重试推送 ({attempt}/{retries})", "warning")
 
-        # 添加远程仓库
-        add_cmd = f'git remote add origin {self.remote_url}'
-        result = self.run_command(add_cmd, "添加远程仓库")
-        return result.returncode == 0 if result else False
+            success, output = self.run_command(
+                "git push -u origin main",
+                "推送代码",
+                show_output=True
+            )
 
-    def verify_remote_connection(self):
-        """验证远程连接"""
-        result = self.run_command("git remote -v", "验证远程连接")
-        if result and result.returncode == 0:
-            print("✓  远程仓库配置:")
-            for line in result.stdout.strip().split('\n'):
-                if line.strip():
-                    print(f"    {line}")
-            return True
+            if success:
+                ConsoleFormatter.print_result(True, "推送成功")
+                return True
+
+            time.sleep(2)  # 重试前等待
+
+        ConsoleFormatter.print_result(False)
+        ConsoleFormatter.print_status("推送失败，请检查:", "error")
+        ConsoleFormatter.print_status("1. 确保GitHub仓库已创建", "info")
+        ConsoleFormatter.print_status("2. 检查网络连接", "info")
+        ConsoleFormatter.print_status(f"3. 手动创建: https://github.com/new", "info")
+
         return False
 
-    def push_to_remote(self):
-        """推送到远程仓库"""
-        print("🔧 推送到远程仓库...")
+    def get_repository_info(self) -> Dict:
+        """获取仓库信息"""
+        info = {
+            "timestamp": datetime.now().isoformat(),
+            "username": self.username,
+            "repository": self.repo_name,
+            "results": self.results.copy()
+        }
 
-        # 检查远程仓库是否存在
-        remote_check = self.run_command("git ls-remote origin", "检查远程仓库访问")
-        if remote_check and remote_check.returncode != 0:
-            print("⚠️  远程仓库不存在或无法访问")
-            print(f"   请在GitHub创建仓库: {self.repo_name}")
-            print(f"   仓库URL: {self.remote_url}")
-            return False
+        # 添加Git配置信息
+        for key in ["user.name", "user.email", "remote.origin.url"]:
+            success, value = self.run_command(f"git config --get {key}")
+            if success:
+                info[key] = value
 
-        result = self.run_command("git push -u origin main", "推送到远程仓库")
+        return info
 
-        if result and result.returncode == 0:
-            print(f"🎉 代码推送成功!")
-            print(f"🌐 您的仓库地址: https://github.com/{self.github_username}/{self.repo_name}")
-            return True
-        else:
-            print("⚠️  推送失败，可能需要手动创建远程仓库")
-            print(f"   请在GitHub创建仓库: {self.repo_name}")
-            print(f"   然后运行: git push -u origin main")
-            return False
+    def save_report(self, info: Dict):
+        """保存报告"""
+        report_file = self.project_path / "git_setup_report.json"
+        with open(report_file, 'w', encoding='utf-8') as f:
+            json.dump(info, f, indent=2, ensure_ascii=False, default=str)
 
-    def get_git_status(self):
-        """获取Git状态"""
-        result = self.run_command("git status", "获取Git状态")
-        if result and result.returncode == 0:
-            print("\n📊 当前Git状态:")
-            print(result.stdout)
-
-    def show_commit_history(self):
-        """显示提交历史"""
-        result = self.run_command("git log --oneline -5", "显示最近5次提交")
-        if result and result.returncode == 0:
-            print("\n📜 提交历史:")
-            print(result.stdout)
-
-    def setup_complete(self):
-        """完成设置"""
-        print("\n" + "=" * 60)
-        print("Git仓库设置完成!")
-        print("=" * 60)
-
-        if self.github_username:
-            print(f"\n📁 本地仓库: {self.project_path}")
-            print(f"🌐 远程仓库: https://github.com/{self.github_username}/{self.repo_name}")
-
-        print("\n📋 后续操作指南:")
-        print("1. 创建新分支: git checkout -b feature/新功能名称")
-        print("2. 提交更改: git add . && git commit -m '描述'")
-        print("3. 推送分支: git push origin feature/新功能名称")
-        print("4. 在GitHub创建Pull Request")
-        print("5. 查看仓库: https://github.com/YOUR_USERNAME/car_power_auto_platform")
-        print("\n" + "=" * 60)
-
-    def run_full_setup(self):
-        """运行完整的设置流程"""
-        print("=" * 60)
-        print("汽车电源测试框架 - Git仓库自动化设置（修复版）")
-        print("=" * 60)
-
-        steps = [
-            ("检查Git安装", self.check_git_installed),
-            ("初始化Git仓库", self.initialize_git_repo),
-            ("配置Git用户信息", self.configure_git_user),
-            ("创建.gitignore文件", self.create_gitignore),
-            ("创建必要目录", self.create_required_dirs),
-            ("添加并提交文件", self.add_and_commit_files),
-            ("重命名主分支", self.rename_main_branch),
-        ]
-
-        if self.github_username:
-            steps.extend([
-                ("添加远程仓库", self.add_remote_origin),
-                ("验证远程连接", self.verify_remote_connection),
-                ("推送到远程仓库", self.push_to_remote),
-            ])
-
-        for step_name, step_func in steps:
-            print(f"\n[{steps.index((step_name, step_func)) + 1}/{len(steps)}] ", end="")
-            if not step_func():
-                print(f"\n❌ 步骤 '{step_name}' 失败，停止执行")
-                print("\n💡 建议: 请检查Git配置，确保已正确设置用户名和邮箱")
-                print("   您可以通过以下命令手动设置:")
-                print("   git config --global user.name '您的姓名'")
-                print("   git config --global user.email '您的邮箱'")
-                return False
-            time.sleep(0.5)
-
-        self.get_git_status()
-        self.show_commit_history()
-        self.setup_complete()
-        return True
+        ConsoleFormatter.print_status(f"报告已保存: {report_file.name}", "info")
 
 
 def main():
     """主函数"""
-    import argparse
+    ConsoleFormatter.print_header("汽车电源测试框架 - Git仓库设置")
 
-    parser = argparse.ArgumentParser(description="Git仓库自动化设置（修复版）")
-    parser.add_argument("--path", help="项目路径，默认为当前目录")
-    parser.add_argument("--username", help="GitHub用户名")
-    parser.add_argument("--repo", help="仓库名称", default="car_power_auto_platform")
+    # 获取项目信息
+    project_path = Path.cwd()
+    print(f"📁 项目路径: {project_path}")
 
-    args = parser.parse_args()
+    # 获取GitHub信息
+    print("\n" + "=" * 60)
+    print("请输入GitHub配置信息:")
+    print("-" * 60)
 
-    if not args.username:
-        print("❌ 错误: 必须提供GitHub用户名")
-        print("   使用 --username 参数指定GitHub用户名")
-        sys.exit(1)
+    username = input("GitHub用户名: ").strip()
+    if not username:
+        ConsoleFormatter.print_status("必须提供用户名", "error")
+        return 1
 
-    setup = GitRepositorySetup(
-        project_path=args.path,
-        github_username=args.username,
-        repo_name=args.repo
-    )
+    repo_name = input("仓库名称 [car_power_auto_platform]: ").strip()
+    if not repo_name:
+        repo_name = "car_power_auto_platform"
 
-    success = setup.run_full_setup()
-    sys.exit(0 if success else 1)
+    # 创建管理器
+    manager = GitManager(username, repo_name, project_path)
+
+    # 定义执行步骤
+    steps = [
+        ("检查Git安装", manager.check_git_installation),
+        ("初始化仓库", manager.initialize_repository),
+        ("配置用户", manager.configure_user),
+        ("设置远程", manager.setup_remote),
+        ("提交代码", manager.add_and_commit_files),
+        ("推送代码", manager.push_to_remote),
+    ]
+
+    # 执行步骤
+    print("\n" + "=" * 60)
+    print("开始执行Git仓库设置...")
+    print("=" * 60)
+
+    for i, (desc, func) in enumerate(steps, 1):
+        ConsoleFormatter.print_step(i, len(steps), desc)
+
+        # 显示进度条
+        if hasattr(ConsoleFormatter, 'print_progress_bar'):
+            ConsoleFormatter.print_progress_bar(i - 1, len(steps))
+
+        # 执行步骤
+        try:
+            success = func()
+            if not success and desc != "推送代码":  # 推送可能失败，但其他步骤必须成功
+                ConsoleFormatter.print_status("关键步骤失败，终止执行", "error")
+                return 1
+        except Exception as e:
+            ConsoleFormatter.print_status(f"执行异常: {e}", "error")
+            return 1
+
+    # 完成进度条
+    if hasattr(ConsoleFormatter, 'print_progress_bar'):
+        ConsoleFormatter.print_progress_bar(len(steps), len(steps))
+        print()  # 换行
+
+    # 保存报告
+    ConsoleFormatter.print_header("设置完成")
+    repo_info = manager.get_repository_info()
+    manager.save_report(repo_info)
+
+    # 打印摘要
+    ConsoleFormatter.print_summary_table(manager.results)
+
+    # 最终信息
+    print("\n" + "=" * 60)
+    print(f"📁 本地仓库: {project_path}")
+    print(f"🌐 远程仓库: https://github.com/{username}/{repo_name}")
+
+    if manager.results.get("推送代码", False):
+        print("\n🎉 恭喜！代码已成功推送到GitHub！")
+    else:
+        print("\n⚠️  代码已提交到本地，但需要手动推送到GitHub")
+        print("   请运行: git push -u origin main")
+
+    print("\n📋 后续操作:")
+    print("  1. 创建新分支: git checkout -b feature/新功能")
+    print("  2. 提交更改: git add . && git commit -m '描述'")
+    print("  3. 推送分支: git push origin feature/新功能")
+    print("  4. 在GitHub创建Pull Request")
+
+    return 0
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        main()
-    else:
-        print("Git仓库自动化设置（修复版）")
-        print("=" * 60)
-
-        project_path = input("项目路径 (回车使用当前目录): ").strip() or None
-        github_username = input("GitHub用户名: ").strip()
-
-        if not github_username:
-            print("❌ 必须提供GitHub用户名")
-            sys.exit(1)
-
-        repo_name = input("仓库名称 (回车使用默认): ").strip() or "car_power_auto_platform"
-
-        setup = GitRepositorySetup(
-            project_path=project_path,
-            github_username=github_username,
-            repo_name=repo_name
-        )
-
-        success = setup.run_full_setup()
-        sys.exit(0 if success else 1)
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print(f"\n\n{ConsoleFormatter.COLORS['warning']}操作被用户中断{ConsoleFormatter.COLORS['reset']}")
+        sys.exit(130)
+    except Exception as e:
+        ConsoleFormatter.print_status(f"程序出错: {e}", "error")
+        sys.exit(1)
