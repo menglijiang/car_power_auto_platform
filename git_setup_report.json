@@ -1,9 +1,89 @@
 {
+  "timestamp": "2026-01-27T18:14:12.530852",
   "project": "汽车电源测试框架",
-  "timestamp": "2026-01-27T18:01:21.036739",
   "username": "menglijiang",
   "repository": "car_power_auto_platform",
   "remote_url": "https://github.com/menglijiang/car_power_auto_platform.git",
   "web_url": "https://github.com/menglijiang/car_power_auto_platform",
-  "project_path": "D:\\Pycharm\\Projects\\xiangshan"
+  "results": {
+    "检查Git安装": {
+      "success": true,
+      "command": "git --version",
+      "output": "git version 2.52.0.windows.1",
+      "timestamp": "2026-01-27T18:12:43.380822"
+    },
+    "设置用户名": {
+      "success": true,
+      "command": "git config user.name \"menglijiang\"",
+      "output": "",
+      "timestamp": "2026-01-27T18:12:43.448877"
+    },
+    "设置邮箱": {
+      "success": true,
+      "command": "git config user.email \"menglijiang@users.noreply.github.com\"",
+      "output": "",
+      "timestamp": "2026-01-27T18:12:43.515965"
+    },
+    "检查当前分支": {
+      "success": true,
+      "command": "git branch --show-current",
+      "output": "main",
+      "timestamp": "2026-01-27T18:12:43.595504"
+    },
+    "检查当前远程配置": {
+      "success": true,
+      "command": "git remote -v",
+      "output": "origin\thttps://github.com/menglijiang/car_power_auto_platform.git (fetch)\norigin\thttps://github.com/menglijiang/car_power_auto_platform.git (push)",
+      "timestamp": "2026-01-27T18:12:43.664743"
+    },
+    "获取当前远程URL": {
+      "success": true,
+      "command": "git remote get-url origin",
+      "output": "https://github.com/menglijiang/car_power_auto_platform.git",
+      "timestamp": "2026-01-27T18:12:43.735734"
+    },
+    "检查Git状态": {
+      "success": true,
+      "command": "git status --porcelain",
+      "output": "M setup_git_repo.py\n?? git_fix_report.json",
+      "timestamp": "2026-01-27T18:12:43.821029"
+    },
+    "添加文件": {
+      "success": true,
+      "command": "git add .",
+      "output": "",
+      "timestamp": "2026-01-27T18:12:43.900964"
+    },
+    "提交更改": {
+      "success": true,
+      "command": "git commit -m \"初始提交: 汽车电源自动化测试框架\n\n项目: car_power_auto_platform\n时间: 2026-01-27 18:12:43\n描述: 48V电源模块自动化测试平台\n\"",
+      "output": "[main faed020] 初始提交: 汽车电源自动化测试框架\n 2 files changed, 448 insertions(+), 127 deletions(-)\n create mode 100644 git_fix_report.json",
+      "timestamp": "2026-01-27T18:12:44.025301"
+    },
+    "检查远程仓库可访问性": {
+      "success": false,
+      "command": "git ls-remote https://github.com/menglijiang/car_power_auto_platform.git HEAD",
+      "output": "fatal: unable to access 'https://github.com/menglijiang/car_power_auto_platform.git/': Failed to connect to github.com port 443 after 21118 ms: Could not connect to server",
+      "timestamp": "2026-01-27T18:13:05.282653"
+    },
+    "推送到GitHub": {
+      "success": false,
+      "command": "git push -u origin main",
+      "output": "fatal: unable to access 'https://github.com/menglijiang/car_power_auto_platform.git/': Failed to connect to github.com port 443 after 21065 ms: Could not connect to server",
+      "timestamp": "2026-01-27T18:14:12.379843"
+    },
+    "检查本地状态": {
+      "success": true,
+      "command": "git status",
+      "output": "On branch main\nYour branch is ahead of 'origin/main' by 1 commit.\n  (use \"git push\" to publish your local commits)\n\nnothing to commit, working tree clean",
+      "timestamp": "2026-01-27T18:14:12.460278"
+    },
+    "检查远程连接": {
+      "success": true,
+      "command": "git remote -v",
+      "output": "origin\thttps://github.com/menglijiang/car_power_auto_platform.git (fetch)\norigin\thttps://github.com/menglijiang/car_power_auto_platform.git (push)",
+      "timestamp": "2026-01-27T18:14:12.530811"
+    }
+  },
+  "success": false
 }
