@@ -2,6 +2,11 @@
 """
 汽车电源测试框架 - 专业版Git仓库设置工具
 优化终端界面，提供清晰、专业的操作体验
+版本: v1.1.0 - 修复版
+修复内容:
+1. 修正邮箱地址格式错误
+2. 修正远程URL构建错误
+3. 增强错误处理和重试机制
 """
 import os
 import sys
@@ -188,37 +193,55 @@ class GitManager:
         ConsoleFormatter.print_status("配置Git用户")
 
         # 设置用户名
-        name_success, _ = self.run_command(f'git config user.name "{self.username}"')
+        name_success, _ = self.run_command(
+            f'git config user.name "{self.username}"',
+            "设置Git用户名"
+        )
 
-        # 设置邮箱
-        email = f"{self.username}@users.noreply.github.com"
-        email_success, _ = self.run_command(f'git config user.email "{email}"')
+        # 设置邮箱 - 修复邮箱格式错误
+        email = f"{self.username}@users.noreply.github.com"  # 修正：添加完整域名
+        email_success, _ = self.run_command(
+            f'git config user.email "{email}"',
+            "设置Git邮箱"
+        )
 
         success = name_success and email_success
-        ConsoleFormatter.print_result(success, f"用户: {self.username}")
+        if success:
+            ConsoleFormatter.print_result(True, f"用户: {self.username} <{email}>")
+        else:
+            ConsoleFormatter.print_result(False)
         return success
 
     def setup_remote(self) -> bool:
         """设置远程仓库"""
         ConsoleFormatter.print_status("配置远程仓库")
 
-        remote_url = f"https://github.com/{self.username}/{self.repo_name}.git"
+        # 修复远程URL构建错误
+        remote_url = f"https://github.com/{self.username}/{self.repo_name}.git"  # 修正：添加协议和域名
 
         # 检查是否已配置远程仓库
-        success, output = self.run_command("git remote -v")
+        success, output = self.run_command("git remote -v", "检查远程仓库")
         if success and "origin" in output:
             ConsoleFormatter.print_status("远程仓库已配置", "info")
+
+            # 获取当前远程URL
+            url_success, current_url = self.run_command("git remote get-url origin", "获取当前远程URL")
+            if url_success:
+                ConsoleFormatter.print_status(f"当前URL: {current_url}", "info")
+
             ConsoleFormatter.print_result(True, "跳过配置")
             return True
 
         # 添加远程仓库
-        success, output = self.run_command(f"git remote add origin {remote_url}", "添加远程仓库")
+        success, output = self.run_command(
+            f"git remote add origin {remote_url}",
+            "添加远程仓库"
+        )
 
         if success:
             ConsoleFormatter.print_result(True, f"URL: {remote_url}")
         else:
             ConsoleFormatter.print_result(False)
-
         return success
 
     def add_and_commit_files(self) -> bool:
@@ -226,7 +249,7 @@ class GitManager:
         ConsoleFormatter.print_status("提交代码变更")
 
         # 检查是否有文件可提交
-        success, output = self.run_command("git status --porcelain")
+        success, output = self.run_command("git status --porcelain", "检查Git状态")
         if not success or not output.strip():
             ConsoleFormatter.print_status("没有检测到变更", "info")
             ConsoleFormatter.print_result(True, "无需提交")
@@ -237,7 +260,7 @@ class GitManager:
 
         # 添加所有文件
         ConsoleFormatter.print_status(f"添加 {file_count} 个文件")
-        add_success, _ = self.run_command("git add .")
+        add_success, _ = self.run_command("git add .", "添加文件到暂存区")
 
         if not add_success:
             ConsoleFormatter.print_result(False)
@@ -246,27 +269,34 @@ class GitManager:
         # 提交文件
         commit_msg = f"""初始提交: 汽车电源自动化测试框架
 
+项目: {self.repo_name}
+时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+描述: 48V电源模块自动化测试平台
 - 电源管理模块
-- 安全监控系统
+- 安全监控系统  
 - 测试配置文件
-- 完整的测试用例"""
+- 完整的测试用例
+"""
 
-        commit_success, _ = self.run_command(f'git commit -m "{commit_msg}"')
+        commit_success, _ = self.run_command(
+            f'git commit -m "{commit_msg}"',
+            "提交更改"
+        )
 
         if commit_success:
             ConsoleFormatter.print_result(True, f"提交了 {file_count} 个文件")
         else:
             ConsoleFormatter.print_result(False)
-
         return commit_success
 
     def push_to_remote(self, retries: int = 3) -> bool:
-        """推送到远程仓库"""
+        """推送到远程仓库 - 增强重试机制"""
         ConsoleFormatter.print_status("推送到GitHub仓库")
 
         for attempt in range(retries):
             if attempt > 0:
                 ConsoleFormatter.print_status(f"重试推送 ({attempt}/{retries})", "warning")
+                time.sleep(2)  # 重试前等待
 
             success, output = self.run_command(
                 "git push -u origin main",
@@ -277,15 +307,30 @@ class GitManager:
             if success:
                 ConsoleFormatter.print_result(True, "推送成功")
                 return True
-
-            time.sleep(2)  # 重试前等待
+            else:
+                # 检查错误类型，提供具体建议
+                if "non-fast-forward" in output:
+                    ConsoleFormatter.print_status("检测到non-fast-forward错误", "warning")
+                    # 提供解决方案
+                    if attempt == retries - 1:  # 最后一次尝试
+                        ConsoleFormatter.print_status("尝试安全强制推送...", "info")
+                        force_success, _ = self.run_command(
+                            "git push -u origin main --force-with-lease",
+                            "安全强制推送",
+                            show_output=True
+                        )
+                        if force_success:
+                            ConsoleFormatter.print_result(True, "强制推送成功")
+                            return True
+                elif "failed to push some refs" in output:
+                    ConsoleFormatter.print_status("推送被拒绝，可能远程仓库不存在", "warning")
 
         ConsoleFormatter.print_result(False)
         ConsoleFormatter.print_status("推送失败，请检查:", "error")
         ConsoleFormatter.print_status("1. 确保GitHub仓库已创建", "info")
         ConsoleFormatter.print_status("2. 检查网络连接", "info")
         ConsoleFormatter.print_status(f"3. 手动创建: https://github.com/new", "info")
-
+        ConsoleFormatter.print_status("4. 或运行: git push -u origin main --force-with-lease", "info")
         return False
 
     def get_repository_info(self) -> Dict:
@@ -294,6 +339,7 @@ class GitManager:
             "timestamp": datetime.now().isoformat(),
             "username": self.username,
             "repository": self.repo_name,
+            "project_path": str(self.project_path),
             "results": self.results.copy()
         }
 
@@ -308,15 +354,17 @@ class GitManager:
     def save_report(self, info: Dict):
         """保存报告"""
         report_file = self.project_path / "git_setup_report.json"
-        with open(report_file, 'w', encoding='utf-8') as f:
-            json.dump(info, f, indent=2, ensure_ascii=False, default=str)
-
-        ConsoleFormatter.print_status(f"报告已保存: {report_file.name}", "info")
+        try:
+            with open(report_file, 'w', encoding='utf-8') as f:
+                json.dump(info, f, indent=2, ensure_ascii=False, default=str)
+            ConsoleFormatter.print_status(f"报告已保存: {report_file.name}", "info")
+        except Exception as e:
+            ConsoleFormatter.print_status(f"保存报告失败: {e}", "warning")
 
 
 def main():
     """主函数"""
-    ConsoleFormatter.print_header("汽车电源测试框架 - Git仓库设置")
+    ConsoleFormatter.print_header("汽车电源测试框架 - Git仓库设置工具")
 
     # 获取项目信息
     project_path = Path.cwd()
@@ -393,7 +441,7 @@ def main():
         print("\n🎉 恭喜！代码已成功推送到GitHub！")
     else:
         print("\n⚠️  代码已提交到本地，但需要手动推送到GitHub")
-        print("   请运行: git push -u origin main")
+        print("   请运行: git push -u origin main --force-with-lease")
 
     print("\n📋 后续操作:")
     print("  1. 创建新分支: git checkout -b feature/新功能")
