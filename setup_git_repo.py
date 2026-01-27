@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 汽车电源测试框架 - Git仓库设置工具
-专业版：修复项目路径和仓库名称问题
-版本: v1.2.0
+完整版本：包含所有Git仓库设置功能
 """
+
 import os
 import sys
 import subprocess
@@ -11,318 +11,157 @@ import time
 import json
 import argparse
 from pathlib import Path
-from typing import Tuple, Dict
 from datetime import datetime
 
 
-class GitSetupTool:
-    """Git仓库设置工具 - 修复版"""
-
-    def __init__(self, username: str, repo_name: str, project_path: Path):
-        self.username = username
-        self.repo_name = repo_name
-        self.project_path = project_path
-        self.results = {}
-
-        # 验证项目路径
-        if not self.project_path.exists():
-            print(f"❌ 错误: 项目路径不存在: {self.project_path}")
-            sys.exit(1)
-
-        os.chdir(self.project_path)
-
-    def run_command(self, cmd: str, description: str = "") -> Tuple[bool, str]:
-        """运行命令并返回结果"""
-        try:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                cwd=self.project_path,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='ignore',
-                timeout=30
-            )
-
-            success = result.returncode == 0
-            output = result.stdout.strip() or result.stderr.strip()
-
-            if description:
-                self.results[description] = success
-
-            return success, output
-        except Exception as e:
-            return False, str(e)
-
-    def check_requirements(self) -> bool:
-        """检查系统要求"""
-        print("1. 检查系统要求...")
-
-        # 检查Git安装
-        success, output = self.run_command("git --version", "Git安装检查")
-        if success:
-            version = output.split()[-1] if output else "未知"
-            print(f"   ✓ Git版本: {version}")
-        else:
-            print("   ✗ Git未安装或不可用")
-            return False
-
-        print(f"   ✓ 项目路径: {self.project_path}")
-        return True
-
-    def configure_user(self) -> bool:
-        """配置用户信息"""
-        print("2. 配置Git用户信息...")
-
-        # 设置用户名
-        name_success, _ = self.run_command(
-            f'git config user.name "{self.username}"',
-            "用户名配置"
-        )
-
-        # 设置邮箱
-        email = f"{self.username}@users.noreply.github.com"
-        email_success, _ = self.run_command(
-            f'git config user.email "{email}"',
-            "邮箱配置"
-        )
-
-        success = name_success and email_success
-        if success:
-            print(f"   ✓ 用户信息配置成功")
-        else:
-            print("   ✗ 用户信息配置失败")
-
-        return success
-
-    def initialize_repository(self) -> bool:
-        """初始化Git仓库"""
-        print("3. 初始化Git仓库...")
-
-        git_dir = self.project_path / ".git"
-        if git_dir.exists():
-            print("   ✓ Git仓库已存在")
-            return True
-
-        success, output = self.run_command("git init", "仓库初始化")
-        if success:
-            print("   ✓ 仓库初始化成功")
-        else:
-            print(f"   ✗ 初始化失败: {output}")
-
-        return success
-
-    def setup_remote_repository(self) -> bool:
-        """设置远程仓库"""
-        print("4. 配置远程仓库...")
-
-        # 检查是否已配置远程仓库
-        success, output = self.run_command("git remote -v", "远程仓库检查")
-        if success and "origin" in output:
-            print("   ✓ 远程仓库已配置")
-            return True
-
-        # 添加远程仓库
-        remote_url = f"https://github.com/{self.username}/{self.repo_name}.git"
-        success, output = self.run_command(
-            f"git remote add origin {remote_url}",
-            "远程仓库添加"
-        )
-
-        if success:
-            print("   ✓ 远程仓库配置成功")
-        else:
-            print(f"   ✗ 远程仓库配置失败: {output}")
-
-        return success
-
-    def add_and_commit_files(self) -> bool:
-        """添加并提交文件"""
-        print("5. 提交代码文件...")
-
-        # 检查是否有文件可提交
-        success, output = self.run_command("git status --porcelain", "文件状态检查")
-        if not success or not output.strip():
-            print("   ℹ 没有检测到文件变更")
-            return True
-
-        # 计算文件数量
-        file_count = len([line for line in output.strip().split('\n') if line.strip()])
-
-        # 添加所有文件
-        add_success, _ = self.run_command("git add .", "文件添加")
-        if not add_success:
-            print("   ✗ 文件添加失败")
-            return False
-
-        # 提交文件
-        commit_message = f"""初始提交: 汽车电源自动化测试框架
-
-项目: {self.repo_name}
-时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-描述: 48V电源模块自动化测试平台
-"""
-
-        commit_success, _ = self.run_command(
-            f'git commit -m "{commit_message}"',
-            "代码提交"
-        )
-
-        if commit_success:
-            print(f"   ✓ 提交成功 ({file_count} 个文件)")
-        else:
-            print("   ✗ 提交失败")
-
-        return commit_success
-
-    def push_to_github(self, retries: int = 3) -> bool:
-        """推送到GitHub"""
-        print("6. 推送到GitHub...")
-
-        for attempt in range(retries):
-            if attempt > 0:
-                print(f"   重试推送 ({attempt}/{retries})...")
-                time.sleep(2)
-
-            success, output = self.run_command(
-                "git push -u origin main",
-                "代码推送"
-            )
-
-            if success:
-                print("   ✓ 推送成功")
-                return True
-            else:
-                print(f"   推送失败: {output[:200]}")
-
-                # 如果是non-fast-forward错误，尝试安全强制推送
-                if "non-fast-forward" in output and attempt == retries - 1:
-                    print("   尝试安全强制推送...")
-                    force_success, _ = self.run_command(
-                        "git push -u origin main --force-with-lease",
-                        "安全强制推送"
-                    )
-                    if force_success:
-                        print("   ✓ 强制推送成功")
-                        return True
-
-        print("   ✗ 推送失败，请检查:")
-        print("     - GitHub仓库是否已创建")
-        print("     - 网络连接是否正常")
-        return False
-
-    def generate_report(self) -> Dict:
-        """生成执行报告"""
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "project_path": str(self.project_path),
-            "github_username": self.username,
-            "repository": self.repo_name,
-            "results": self.results,
-            "success": all(self.results.values())
-        }
-
-    def run_setup(self) -> bool:
-        """运行完整的设置流程"""
-        print("=" * 60)
-        print("汽车电源测试框架 - Git仓库设置工具")
-        print("=" * 60)
-        print(f"项目路径: {self.project_path}")
-        print(f"GitHub用户: {self.username}")
-        print(f"仓库名称: {self.repo_name}")
-        print("=" * 60)
-
-        steps = [
-            ("检查系统要求", self.check_requirements),
-            ("初始化仓库", self.initialize_repository),
-            ("配置用户", self.configure_user),
-            ("设置远程", self.setup_remote_repository),
-            ("提交代码", self.add_and_commit_files),
-            ("推送代码", self.push_to_github),
-        ]
-
-        for step_name, step_func in steps:
-            if not step_func():
-                print(f"\n❌ {step_name}失败，终止执行")
-                return False
-            time.sleep(0.5)
-
-        return True
-
-
-def validate_repo_name(repo_name: str) -> str:
-    """验证和清理仓库名称"""
-    # 移除前后空格
-    repo_name = repo_name.strip()
-
-    # GitHub仓库名称规则：只能包含字母、数字、连字符、下划线
-    import re
-    repo_name = re.sub(r'[^a-zA-Z0-9_-]', '-', repo_name)
-
-    # 不能以连字符开头或结尾
-    repo_name = repo_name.strip('-')
-
-    # 不能以点开头
-    repo_name = repo_name.lstrip('.')
-
-    # 长度限制
-    if len(repo_name) > 100:
-        repo_name = repo_name[:100]
-
-    return repo_name.lower()
-
-
 def main():
-    """主函数"""
-    parser = argparse.ArgumentParser(description="Git仓库设置工具")
-    parser.add_argument("--username", help="GitHub用户名")
-    parser.add_argument("--repo", help="仓库名称")
-    parser.add_argument("--path", help="项目路径", default=".")
+    """主函数 - 完整的Git仓库设置工具"""
+    print("=" * 60)
+    print("汽车电源测试框架 - Git仓库设置工具")
+    print("=" * 60)
 
-    args = parser.parse_args()
+    # 获取用户输入
+    print("\n请输入配置信息:")
+    print("-" * 40)
 
-    # 获取项目路径
-    project_path = Path(args.path).resolve()
+    username = input("GitHub用户名: ").strip()
+    if not username:
+        print("❌ 错误: 必须提供GitHub用户名")
+        return 1
 
-    # 交互式获取缺失的信息
-    if not args.username:
-        args.username = input("GitHub用户名: ").strip()
-        if not args.username:
-            print("错误: 必须提供GitHub用户名")
-            return 1
+    repo_name = input("仓库名称: ").strip()
+    if not repo_name:
+        print("❌ 错误: 必须提供仓库名称")
+        return 1
 
-    if not args.repo:
-        default_repo = "car_power_auto_platform"
-        repo_input = input(f"仓库名称 [{default_repo}]: ").strip()
-        args.repo = repo_input if repo_input else default_repo
+    project_path = input("项目路径: ").strip()
+    if not project_path:
+        project_path = "."
 
-    # 验证和清理仓库名称
-    original_repo = args.repo
-    args.repo = validate_repo_name(args.repo)
-
-    if original_repo != args.repo:
-        print(f"⚠ 仓库名称已清理: {original_repo} -> {args.repo}")
-
-    # 验证项目路径
+    # 解析路径
+    project_path = Path(project_path).resolve()
     if not project_path.exists():
         print(f"❌ 错误: 项目路径不存在: {project_path}")
         return 1
 
-    # 运行设置
-    tool = GitSetupTool(args.username, args.repo, project_path)
-    success = tool.run_setup()
+    # 切换到项目目录
+    os.chdir(project_path)
 
-    if success:
-        print("\n" + "=" * 60)
-        print("🎉 Git仓库设置完成!")
-        print(f"🌐 仓库地址: https://github.com/{args.username}/{args.repo}")
-    else:
-        print("\n❌ Git仓库设置失败")
-        return 1
+    print(f"\n开始设置Git仓库...")
+    print(f"项目路径: {project_path}")
+    print(f"GitHub用户: {username}")
+    print(f"仓库名称: {repo_name}")
+    print("-" * 40)
+
+    # 定义远程URL
+    remote_url = f"https://github.com/{username}/{repo_name}.git"
+    web_url = f"https://github.com/{username}/{repo_name}"
+
+    # 执行步骤
+    steps = [
+        ("检查Git安装", f"git --version"),
+        ("初始化仓库", "git init"),
+        ("配置用户", f'git config user.name "{username}"'),
+        ("配置邮箱", f'git config user.email "{username}@users.noreply.github.com"'),
+        ("设置远程", f"git remote add origin {remote_url}"),
+        ("添加文件", "git add ."),
+        ("提交更改", 'git commit -m "初始提交: 汽车电源测试框架"'),
+        ("推送到GitHub", "git push -u origin main")
+    ]
+
+    # 执行所有步骤
+    for i, (desc, cmd) in enumerate(steps, 1):
+        print(f"\n[{i}/{len(steps)}] {desc}...")
+
+        try:
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode == 0:
+                print(f"   ✅ 成功")
+                if result.stdout.strip():
+                    output = result.stdout.strip()
+                    if len(output) > 100:
+                        output = output[:100] + "..."
+                    print(f"      输出: {output}")
+            else:
+                print(f"   ❌ 失败")
+                if result.stderr.strip():
+                    error = result.stderr.strip()
+                    if len(error) > 100:
+                        error = error[:100] + "..."
+                    print(f"      错误: {error}")
+
+                # 特殊处理推送失败
+                if "push" in cmd and "non-fast-forward" in result.stderr:
+                    print("   🔄 检测到冲突，尝试修复...")
+                    fix_commands = [
+                        ("拉取远程更改", "git pull origin main --allow-unrelated-histories"),
+                        ("安全推送", "git push -u origin main --force-with-lease"),
+                        ("强制推送", "git push -u origin main --force")
+                    ]
+
+                    for fix_desc, fix_cmd in fix_commands:
+                        print(f"      尝试: {fix_desc}...")
+                        fix_result = subprocess.run(fix_cmd, shell=True, capture_output=True, text=True)
+                        if fix_result.returncode == 0:
+                            print(f"         ✅ 修复成功")
+                            break
+                        else:
+                            print(f"         ❌ 修复失败")
+
+        except Exception as e:
+            print(f"   💥 异常: {e}")
+
+    # 生成报告
+    report = {
+        "project": "汽车电源测试框架",
+        "timestamp": datetime.now().isoformat(),
+        "username": username,
+        "repository": repo_name,
+        "remote_url": remote_url,
+        "web_url": web_url,
+        "project_path": str(project_path)
+    }
+
+    # 保存报告
+    report_file = project_path / "git_setup_report.json"
+    try:
+        with open(report_file, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+        print(f"\n📄 报告已保存: {report_file}")
+    except Exception as e:
+        print(f"⚠️  保存报告失败: {e}")
+
+    # 最终结果
+    print("\n" + "=" * 60)
+    print("设置完成!")
+    print("=" * 60)
+    print(f"📁 项目: {project_path}")
+    print(f"🌐 仓库: {web_url}")
+    print(f"👤 用户: {username}")
+    print(f"⏰ 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    print("\n后续操作:")
+    print("1. 访问仓库确认: " + web_url)
+    print("2. 创建新分支: git checkout -b feature/新功能")
+    print("3. 提交更改: git add . && git commit -m '描述'")
+    print("4. 推送分支: git push origin feature/新功能")
 
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print("\n\n操作被用户中断")
+        sys.exit(130)
+    except Exception as e:
+        print(f"\n程序执行异常: {e}")
+        sys.exit(1)
