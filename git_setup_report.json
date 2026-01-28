@@ -1,11 +1,21 @@
 {
-  "timestamp": "2026-01-28T09:36:21.367626",
+  "timestamp": "2026-01-28T09:39:44.409552",
   "project": "汽车电源测试框架",
   "username": "menglijiang",
   "repository": "car_power_auto_platform",
   "remote_url": "https://github.com/menglijiang/car_power_auto_platform.git",
   "web_url": "https://github.com/menglijiang/car_power_auto_platform",
   "project_path": "D:\\Pycharm\\Projects\\xiangshan",
-  "commit_message": "第二次测试提交是否成功 - 2026-01-28 09:35:41",
-  "success": false
+  "commit_message": "第三次测试提交是否成功\n\n项目: 汽车电源测试框架\n时间: 2026-01-28 09:39:01\n描述: 48V电源模块自动化测试平台\n",
+  "success": false,
+  "results": {
+    "检查Git安装": true,
+    "初始化仓库": true,
+    "配置用户": true,
+    "配置邮箱": true,
+    "智能设置远程仓库": true,
+    "添加文件": true,
+    "提交更改": true,
+    "推送到GitHub": false
+  }
 }
