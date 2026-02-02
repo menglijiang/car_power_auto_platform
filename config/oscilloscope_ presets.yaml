@@ -1,0 +1,15 @@
+# 示波器测试预设配置
+test_presets:
+  power_supply_ripple:
+    description: "电源纹波测试预设"
+    parameters:
+      timebase_scale: 0.0001    # 100us/div
+      channel1_scale: 0.01      # 10mV/div
+      trigger_level: 0.0
+
+  transient_response:
+    description: "瞬态响应测试预设"
+    parameters:
+      timebase_scale: 0.00001   # 10us/div
+      channel1_scale: 0.1        # 100mV/div
+      trigger_level: 24.0

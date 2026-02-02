@@ -17,3 +17,12 @@ ruamel.yaml==0.17.21
 # 基础工具
 colorama==0.4.6
 loguru==0.7.2
+
+# 现有依赖
+pytest>=7.0.0
+numpy>=1.21.0
+
+# 新增示波器控制依赖
+pyvisa>=1.12.0
+pyvisa-py>=0.5.3
+pyyaml>=6.0
